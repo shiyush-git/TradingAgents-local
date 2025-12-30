@@ -57,7 +57,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "local",
     "yfinance",
-    "openai",
+    #"openai",
     "google"
 ]
 

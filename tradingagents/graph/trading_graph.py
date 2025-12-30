@@ -14,6 +14,8 @@ from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import *
 from tradingagents.default_config import DEFAULT_CONFIG
+
+
 from tradingagents.agents.utils.memory import FinancialSituationMemory
 from tradingagents.agents.utils.agent_states import (
     AgentState,
@@ -36,12 +38,16 @@ from tradingagents.agents.utils.agent_utils import (
     get_global_news
 )
 
+
+
 from .conditional_logic import ConditionalLogic
 from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
 
+
+from tradingagents.agents.utils.llm_wrapper import wrap_llm_with_retry
 
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
@@ -73,14 +79,21 @@ class TradingAgentsGraph:
 
         # Initialize LLMs
         if self.config["llm_provider"].lower() == "openai" or self.config["llm_provider"] == "ollama" or self.config["llm_provider"] == "openrouter":
-            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+            self.deep_thinking_llm = wrap_llm_with_retry(ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"]))
+            self.quick_thinking_llm = wrap_llm_with_retry(ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"]))
+            
+            # Initialize specialized News LLM if configured
+            news_model = self.config.get("news_agent_llm", self.config["quick_think_llm"])
+            self.news_agent_llm = wrap_llm_with_retry(ChatOpenAI(model=news_model, base_url=self.config["backend_url"]))
+            
         elif self.config["llm_provider"].lower() == "anthropic":
-            self.deep_thinking_llm = ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+            self.deep_thinking_llm = wrap_llm_with_retry(ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"]))
+            self.quick_thinking_llm = wrap_llm_with_retry(ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"]))
+            self.news_agent_llm = self.quick_thinking_llm 
         elif self.config["llm_provider"].lower() == "google":
-            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
-            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
+            self.deep_thinking_llm = wrap_llm_with_retry(ChatGoogleGenerativeAI(model=self.config["deep_think_llm"]))
+            self.quick_thinking_llm = wrap_llm_with_retry(ChatGoogleGenerativeAI(model=self.config["quick_think_llm"]))
+            self.news_agent_llm = self.quick_thinking_llm
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
         
@@ -99,6 +112,7 @@ class TradingAgentsGraph:
         self.graph_setup = GraphSetup(
             self.quick_thinking_llm,
             self.deep_thinking_llm,
+            self.news_agent_llm,
             self.tool_nodes,
             self.bull_memory,
             self.bear_memory,
@@ -193,7 +207,7 @@ class TradingAgentsGraph:
         return final_state, self.process_signal(final_state["final_trade_decision"])
 
     def _log_state(self, trade_date, final_state):
-        """Log the final state to a JSON file."""
+        """Log the final state to a JSON file and save individual reports."""
         self.log_states_dict[str(trade_date)] = {
             "company_of_interest": final_state["company_of_interest"],
             "trade_date": final_state["trade_date"],
@@ -224,7 +238,7 @@ class TradingAgentsGraph:
             "final_trade_decision": final_state["final_trade_decision"],
         }
 
-        # Save to file
+        # Save full state log
         directory = Path(f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/")
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -233,6 +247,60 @@ class TradingAgentsGraph:
             "w",
         ) as f:
             json.dump(self.log_states_dict, f, indent=4)
+        
+        # Save individual reports to results directory
+        results_dir = Path(f"results/{self.ticker}/{trade_date}")
+        results_dir.mkdir(parents=True, exist_ok=True)
+        
+        def save_report(filename, content):
+            if content:
+                with open(results_dir / filename, "w", encoding='utf-8') as f:
+                    f.write(content)
+
+        save_report("1_market_analysis.md", final_state["market_report"])
+        save_report("2_news_analysis.md", final_state["news_report"])
+        save_report("3_social_sentiment.md", final_state["sentiment_report"])
+        save_report("4_fundamentals.md", final_state["fundamentals_report"])
+        
+        # Save discussions and decisions
+        debate_content = f"""# Investment Debate
+        ## Bull Case
+        {final_state["investment_debate_state"]["bull_history"]}
+
+        ## Bear Case
+        {final_state["investment_debate_state"]["bear_history"]}
+
+        ## Debate History
+        {final_state["investment_debate_state"]["history"]}
+
+        ## Judge Decision
+        {final_state["investment_debate_state"]["judge_decision"]}
+        """
+        save_report("5_investment_debate.md", debate_content)
+        
+        risk_content = f"""# Risk Management Debate
+## Risky Analyst
+{final_state["risk_debate_state"]["risky_history"]}
+
+## Safe Analyst
+{final_state["risk_debate_state"]["safe_history"]}
+
+## Neutral Analyst
+{final_state["risk_debate_state"]["neutral_history"]}
+
+## Debate History
+{final_state["risk_debate_state"]["history"]}
+
+## Risk Manager Decision
+{final_state["risk_debate_state"]["judge_decision"]}
+"""
+        save_report("6_risk_debate.md", risk_content)
+        
+        save_report("7_investment_plan.md", final_state["investment_plan"])
+        save_report("8_trader_decision.md", final_state["trader_investment_plan"])
+        save_report("9_final_decision.md", final_state["final_trade_decision"])
+        
+
 
     def reflect_and_remember(self, returns_losses):
         """Reflect on decisions and update memory based on returns."""

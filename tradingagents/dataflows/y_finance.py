@@ -128,6 +128,19 @@ def get_stock_stats_indicators_window(
         ),
     }
 
+    # Support for comma-separated indicators (bulk request)
+    if "," in indicator:
+        indicators_list = [i.strip() for i in indicator.split(",")]
+        result_str = ""
+        for ind in indicators_list:
+            if ind in best_ind_params:
+                # Recursively call for each indicator
+                # Optimization: We could optimize this further but for now recursion is safest
+                # to reuse the logic. Since _get_stock_stats_bulk caches data, it should be fast.
+                result_str += get_stock_stats_indicators_window(symbol, ind, curr_date, look_back_days)
+                result_str += "\n\n" + "="*50 + "\n\n"
+        return result_str
+
     if indicator not in best_ind_params:
         raise ValueError(
             f"Indicator {indicator} is not supported. Please choose from: {list(best_ind_params.keys())}"

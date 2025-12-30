@@ -16,8 +16,18 @@ def create_news_analyst(llm):
         ]
 
         system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            "You are a top-tier financial news analyst. Your goal is to produce a deep, insight-driven market report."
+            "\n\nKey Objectives:"
+            "\n1. Use 'get_global_news' to understand the macro environment."
+            "\n2. Use 'get_news' to find specific details about the target company and its industry."
+            "\n3. Synthesize all information into a professional Markdown report."
+            "\n\nIMPORTANT:"
+            "\n- Provide concrete analysis, not vague summaries."
+            "\n- Focus on facts, numbers, and market sentiment."
+            "\n- You MUST conclude with a clear Markdown table summarizing key bullish and bearish factors."
+            "\n\nTool Usage Guidelines:"
+            "\n- When calling 'get_news', ensure dates are in 'yyyy-mm-dd' format."
+            "\n- If no news is found, try broadening your search query or adjusting dates."
         )
 
         prompt = ChatPromptTemplate.from_messages(

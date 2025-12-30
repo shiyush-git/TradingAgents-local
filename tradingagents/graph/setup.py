@@ -18,6 +18,7 @@ class GraphSetup:
         self,
         quick_thinking_llm: ChatOpenAI,
         deep_thinking_llm: ChatOpenAI,
+        news_agent_llm: ChatOpenAI,
         tool_nodes: Dict[str, ToolNode],
         bull_memory,
         bear_memory,
@@ -29,6 +30,7 @@ class GraphSetup:
         """Initialize with required components."""
         self.quick_thinking_llm = quick_thinking_llm
         self.deep_thinking_llm = deep_thinking_llm
+        self.news_agent_llm = news_agent_llm
         self.tool_nodes = tool_nodes
         self.bull_memory = bull_memory
         self.bear_memory = bear_memory
@@ -66,14 +68,14 @@ class GraphSetup:
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(
-                self.quick_thinking_llm
+                self.news_agent_llm
             )
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
             analyst_nodes["news"] = create_news_analyst(
-                self.quick_thinking_llm
+                self.news_agent_llm
             )
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]

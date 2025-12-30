@@ -9,11 +9,11 @@ DEFAULT_CONFIG = {
         "dataflows/data_cache",
     ),
     # LLM settings
-    "llm_provider": "openai",
-    "deep_think_llm": "o4-mini",
-    "quick_think_llm": "gpt-4o-mini",
-    "quick_think_llm": "gpt-4o-mini",
-    "backend_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+    # LLM settings
+    "llm_provider": os.getenv("LLM_PROVIDER", "ollama"),
+    "deep_think_llm": os.getenv("DEEP_THINK_LLM", "deepseek-v3.2:cloud"),
+    "quick_think_llm": os.getenv("QUICK_THINK_LLM", "gpt-oss-20b:q4_k_m"),
+    "backend_url": os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1"),
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
